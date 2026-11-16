@@ -1,17 +1,21 @@
-print('[POLICEJOB] CLIENT MAIN LUA ZOSTAL URUCHOMIONY')
+-- SPDX-License-Identifier: GPL-3.0-only
+-- Copyright (C) 2022-2026 ESX Framework
 
--- Reception interaction is registered first, independently of the police-only marker loop.
+local CurrentActionData, handcuffTimer, dragStatus, blipsCops, currentTask = {}, {}, {}, {}, {}
+local HasAlreadyEnteredMarker, isDead, isHandcuffed, hasAlreadyJoined, playerInService = false, false, false, false, false
+local LastStation, LastPart, LastPartNum, LastEntity, CurrentAction, CurrentActionMsg
+dragStatus.isDragged, isInShopMenu = false, false
+
+-- Reception duty interaction uses the resource's existing E keybind (xLib.addKeybind).
 CreateThread(function()
-	print('[POLICEJOB] Reception duty thread started')
 	local reception = vector3(441.2, -981.9, 30.6)
 	local interactionDistance = 2.5
-	local markerDistance = 25.0
-	local proximityReported = false
+	local markerDistance = 20.0
+	local wasNearReception = false
 
 	while true do
 		local sleep = 1000
-		local ped = PlayerPedId()
-		local coords = GetEntityCoords(ped)
+		local coords = GetEntityCoords(PlayerPedId())
 		local distance = #(coords - reception)
 
 		if distance < markerDistance then
@@ -20,45 +24,35 @@ CreateThread(function()
 				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
 				0.55, 0.55, 0.55, 40, 120, 220, 220,
 				false, true, 2, false, nil, nil, false)
+		end
 
-			if distance < 5.0 and not proximityReported then
-				print(('[POLICEJOB] Reception detected; distance=%.2f; playerZ=%.2f'):format(distance, coords.z))
-				proximityReported = true
-			elseif distance >= 5.0 then
-				proximityReported = false
+		if distance < interactionDistance then
+			if not wasNearReception then
+				print(('[POLICEJOB] Reception interaction active; distance=%.2f'):format(distance))
+				wasNearReception = true
 			end
 
-			if distance < interactionDistance then
-				local playerData = ESX.GetPlayerData and ESX.GetPlayerData() or ESX.PlayerData
-				local job = playerData and playerData.job
-				local onDuty = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == true
+			local playerData = ESX and ESX.PlayerData
+			local job = playerData and playerData.job
+			local onDuty = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == true
 
-				if job and job.name == 'police' and onDuty then
-					ESX.ShowHelpNotification('Naciśnij ~INPUT_CONTEXT~, aby zakończyć służbę')
-				else
-					ESX.ShowHelpNotification('Naciśnij ~INPUT_CONTEXT~, aby rozpocząć służbę')
-				end
-
-				if IsControlJustReleased(0, 38) then
-					print('[POLICEJOB] Reception E pressed; sending toggleDuty')
-					TriggerServerEvent('esx_policejob:toggleDuty')
-					Wait(750)
-				end
+			CurrentAction = 'menu_duty'
+			CurrentActionMsg = (job and job.name == 'police' and onDuty)
+				and 'Naciśnij ~INPUT_CONTEXT~, aby zakończyć służbę'
+				or 'Naciśnij ~INPUT_CONTEXT~, aby rozpocząć służbę'
+			CurrentActionData = {}
+		elseif wasNearReception then
+			wasNearReception = false
+			if CurrentAction == 'menu_duty' then
+				CurrentAction = nil
+				CurrentActionMsg = nil
+				CurrentActionData = {}
 			end
 		end
 
 		Wait(sleep)
 	end
 end)
-
-
--- SPDX-License-Identifier: GPL-3.0-only
--- Copyright (C) 2022-2026 ESX Framework
-
-local CurrentActionData, handcuffTimer, dragStatus, blipsCops, currentTask = {}, {}, {}, {}, {}
-local HasAlreadyEnteredMarker, isDead, isHandcuffed, hasAlreadyJoined, playerInService = false, false, false, false, false
-local LastStation, LastPart, LastPartNum, LastEntity, CurrentAction, CurrentActionMsg
-dragStatus.isDragged, isInShopMenu = false, false
 
 function OpenPoliceMenu(menuType, name, title, elements, submit, cancel, change, close)
 	return ESX.UI.Menu.Open(menuType, GetCurrentResourceName(), name, {
@@ -1457,6 +1451,7 @@ xLib.addKeybind({
 		end
 
 		if CurrentAction == 'menu_duty' then
+			print('[POLICEJOB] Reception E keybind pressed; sending toggleDuty')
 			TriggerServerEvent('esx_policejob:toggleDuty')
 			CurrentAction = nil
 			CurrentActionMsg = nil
