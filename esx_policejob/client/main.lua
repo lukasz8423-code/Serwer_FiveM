@@ -1397,7 +1397,7 @@ xLib.addKeybind({
 			end, {wash = false})
 		elseif CurrentAction == 'remove_entity' then
 			if CurrentActionData.entity and DoesEntityExist(CurrentActionData.entity) then
-				xLib.game.deleteObject(CurrentActionData.entity)
+				DeleteEntity(CurrentActionData.entity)
 			end
 			CurrentAction = nil
 			CurrentActionData = {}
