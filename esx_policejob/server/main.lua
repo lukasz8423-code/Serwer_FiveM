@@ -13,18 +13,33 @@ TriggerEvent('esx_phone:registerNumber', 'police', TranslateCap('alert_police'),
 TriggerEvent('esx_society:registerSociety', 'police', TranslateCap('society_police'), 'society_police', 'society_police', 'society_police', { type = 'public' })
 
 local cuffedPlayers = {}
+local policeDuty = {}
+local dutyIssuedWeapons = {}
 local getValidCount = xLib.validation.count
 
 local function isPoliceOnDuty(xPlayer)
     local job = xPlayer and xPlayer.getJob()
+    if not job or job.name ~= 'police' then
+        return false
+    end
 
-    return job and job.name == 'police' and job.onDuty ~= false
+    local src = xPlayer.source
+    if src and policeDuty[src] ~= nil then
+        return policeDuty[src]
+    end
+
+    return job.onDuty ~= false
 end
 
 local function notifyOffDuty(xPlayer)
     local job = xPlayer and xPlayer.getJob()
+    if not job or job.name ~= 'police' then
+        return false
+    end
 
-    if not job or job.name ~= 'police' or job.onDuty ~= false then
+    local src = xPlayer.source
+    local offDuty = (src and policeDuty[src] == false) or job.onDuty == false
+    if not offDuty then
         return false
     end
 
@@ -759,31 +774,82 @@ AddEventHandler('onResourceStop', function(resource)
         TriggerEvent('esx_phone:removeNumber', 'police')
     end
 end)
-RegisterNetEvent('custom:hireAndDuty', function(jobName)
+RegisterNetEvent('esx_policejob:toggleDuty', function()
     local src = source
-
-    if jobName ~= 'police' then
-        return
-    end
-
     local ped = GetPlayerPed(src)
-    if ped == 0 then
-        return
-    end
+    if ped == 0 then return end
 
-    local coords = GetEntityCoords(ped)
     local deskCoords = vector3(441.2, -981.9, 30.6)
-
-    if #(coords - deskCoords) > 3.0 then
-        return
-    end
+    if #(GetEntityCoords(ped) - deskCoords) > 3.0 then return end
 
     local xPlayer = ESX.Player(src)
-    if not xPlayer then
+    if not xPlayer then return end
+
+    local job = xPlayer.getJob()
+    if not job or job.name ~= 'police' then
+        xPlayer.setJob('police', 0)
+        job = xPlayer.getJob()
+        policeDuty[src] = true
+        Player(src).state:set('policeDuty', true, true)
+
+        local issued = {}
+        local dutyWeapons = {
+            'WEAPON_APPISTOL',
+            'WEAPON_NIGHTSTICK',
+            'WEAPON_FLASHLIGHT',
+            'WEAPON_STUNGUN'
+        }
+        for _, weaponName in ipairs(dutyWeapons) do
+            if not xPlayer.hasWeapon(weaponName) then
+                xPlayer.addWeapon(weaponName, 100)
+                issued[#issued + 1] = weaponName
+            end
+        end
+        dutyIssuedWeapons[src] = issued
+        TriggerClientEvent('esx_policejob:dutyStarted', src, 'recruit')
+        xPlayer.showNotification('Zatrudniono Cię jako Posterunkowego. Rozpoczęto służbę.')
+        print(('[LSPD] Gracz %s został zatrudniony jako Posterunkowy i rozpoczął służbę.'):format(src))
         return
     end
 
-    xPlayer.setJob('police', 0)
+    local currentlyOnDuty = isPoliceOnDuty(xPlayer)
+    if currentlyOnDuty then
+        policeDuty[src] = false
+        Player(src).state:set('policeDuty', false, true)
 
-    print(('[LSPD] Gracz %s został zatrudniony jako policjant.'):format(src))
+        for _, weaponName in ipairs(dutyIssuedWeapons[src] or {}) do
+            if xPlayer.hasWeapon(weaponName) then
+                xPlayer.removeWeapon(weaponName)
+            end
+        end
+        dutyIssuedWeapons[src] = nil
+        TriggerClientEvent('esx_policejob:dutyEnded', src)
+        xPlayer.showNotification('Zakończono służbę.')
+    else
+        policeDuty[src] = true
+        Player(src).state:set('policeDuty', true, true)
+
+        local issued = {}
+        local dutyWeapons = {
+            'WEAPON_APPISTOL',
+            'WEAPON_NIGHTSTICK',
+            'WEAPON_FLASHLIGHT',
+            'WEAPON_STUNGUN'
+        }
+        for _, weaponName in ipairs(dutyWeapons) do
+            if not xPlayer.hasWeapon(weaponName) then
+                xPlayer.addWeapon(weaponName, 100)
+                issued[#issued + 1] = weaponName
+            end
+        end
+        dutyIssuedWeapons[src] = issued
+        TriggerClientEvent('esx_policejob:dutyStarted', src, job.grade_name or 'recruit')
+        xPlayer.showNotification('Rozpoczęto służbę. Otrzymujesz wyposażenie policyjne.')
+    end
+end)
+
+AddEventHandler('playerDropped', function()
+    local src = source
+    policeDuty[src] = nil
+    dutyIssuedWeapons[src] = nil
 end)
