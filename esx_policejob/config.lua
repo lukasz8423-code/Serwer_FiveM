@@ -22,7 +22,7 @@ Config.HandcuffTimer = 10 * 60000
 
 Config.EnableCustomPeds = false
 
-Config.EnableESXService = true
+Config.EnableESXService = false
 Config.MaxInService = -1
 
 Config.EnableFinePresets = false
