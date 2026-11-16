@@ -1370,182 +1370,40 @@ CreateThread(function()
 end)
 
 xLib.addKeybind({
-    name = "police:interact",
-    description = "(ESX PoliceJob) " .. TranslateCap('interaction'),
-    defaultMapper = "keyboard",
-    defaultKey = "E",
-    onPressed = function()
-	if not CurrentAction then 
-		return 
-	end
-
-	if not ESX.PlayerData.job or ESX.PlayerData.job.name ~= 'police' then
-		return
-	end
-	if CurrentAction == 'menu_cloakroom' then
-		
-function OpenCloakroomMenu()
-	if not Config.EnableESXService then
-		ESX.ShowNotification('System służby jest wyłączony w konfiguracji.')
-		return
-	end
-
-	local playerPed = PlayerPedId()
-	local grade = ESX.PlayerData.job.grade_name
-
-	xLib.callback('esx_service:isInService', false, function(isInService)
-		playerInService = isInService
-
-		local elements = {}
-
-		if not isInService then
-			elements[#elements+1] = {
-				label = 'Rozpocznij służbę',
-				value = 'start_service'
-			}
-		else
-			elements[#elements+1] = {
-				label = 'Zakończ służbę',
-				value = 'end_service'
-			}
-
-			elements[#elements+1] = {
-				label = TranslateCap('bullet_wear'),
-				uniform = 'bullet_wear'
-			}
-
-			elements[#elements+1] = {
-				label = TranslateCap('gilet_wear'),
-				uniform = 'gilet_wear'
-			}
-
-			elements[#elements+1] = {
-				label = TranslateCap('police_wear'),
-				value = 'police_wear'
-			}
-
-			if Config.EnableCustomPeds then
-				for _, v in ipairs(Config.CustomPeds.shared or {}) do
-					elements[#elements+1] = {
-						label = v.label,
-						value = 'freemode_ped',
-						maleModel = v.maleModel,
-						femaleModel = v.femaleModel
-					}
-				end
-
-				for _, v in ipairs(Config.CustomPeds[grade] or {}) do
-					elements[#elements+1] = {
-						label = v.label,
-						value = 'freemode_ped',
-						maleModel = v.maleModel,
-						femaleModel = v.femaleModel
-					}
-				end
-			end
+	name = "police:interact",
+	description = "(ESX PoliceJob) " .. TranslateCap('interaction'),
+	defaultMapper = "keyboard",
+	defaultKey = "E",
+	onPressed = function()
+		if not CurrentAction then
+			return
 		end
 
-		OpenPoliceMenu('default', 'cloakroom', TranslateCap('cloakroom'), elements, function(data, menu)
-			local action = data.current.value
+		if not ESX.PlayerData.job or ESX.PlayerData.job.name ~= 'police' then
+			return
+		end
 
-			if action == 'start_service' then
+		if CurrentAction == 'menu_cloakroom' then
+			OpenCloakroomMenu()
+		elseif CurrentAction == 'menu_armory' then
+			OpenArmoryMenu(CurrentActionData.station)
+		elseif CurrentAction == 'menu_vehicle_spawner' then
+			OpenVehicleSpawnerMenu('car', CurrentActionData.station, CurrentActionData.part, CurrentActionData.partNum)
+		elseif CurrentAction == 'Helicopters' then
+			OpenVehicleSpawnerMenu('helicopter', CurrentActionData.station, CurrentActionData.part, CurrentActionData.partNum)
+		elseif CurrentAction == 'menu_boss_actions' then
+			TriggerEvent('esx_society:openBossMenu', 'police', function(data, menu)
 				menu.close()
-
-				xLib.callback('esx_service:enableService', false, function(canTakeService, maxInService, inServiceCount)
-					if not canTakeService then
-						ESX.ShowNotification(TranslateCap('service_max', inServiceCount, maxInService))
-						return
-					end
-
-					playerInService = true
-					ESX.ShowNotification(TranslateCap('service_in'))
-					OpenCloakroomMenu()
-				end, 'police')
-
-				return
+			end, {wash = false})
+		elseif CurrentAction == 'remove_entity' then
+			if CurrentActionData.entity and DoesEntityExist(CurrentActionData.entity) then
+				xLib.game.deleteObject(CurrentActionData.entity)
 			end
-
-			if action == 'end_service' then
-				menu.close()
-
-				xLib.callback('esx_service:disableService', false, function(disabled)
-					if not disabled then
-						ESX.ShowNotification('Nie udało się zakończyć służby.')
-						return
-					end
-
-					playerInService = false
-
-					xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
-						if Config.EnableCustomPeds then
-							local isMale = skin.sex == 0
-
-							TriggerEvent('skinchanger:loadDefaultModel', isMale, function()
-								xLib.callback('esx_skin:getPlayerSkin', false, function(defaultSkin)
-									TriggerEvent('skinchanger:loadSkin', defaultSkin)
-									TriggerEvent('esx:restoreLoadout')
-								end)
-							end)
-						else
-							TriggerEvent('skinchanger:loadSkin', skin)
-						end
-					end)
-
-					ESX.ShowNotification(TranslateCap('service_out'))
-				end, 'police')
-
-				return
-			end
-
-			cleanPlayer(playerPed)
-
-			if data.current.uniform then
-				setUniform(data.current.uniform, playerPed)
-
-			elseif action == 'police_wear' then
-				xLib.callback('esx_skin:getPlayerSkin', false, function(skin, jobSkin)
-					if type(skin) ~= 'table' then
-						setUniform(grade, playerPed)
-						return
-					end
-
-					local uniform = jobSkin and (skin.sex == 0 and jobSkin.skin_male or jobSkin.skin_female)
-
-					if type(uniform) == 'table' and next(uniform) then
-						TriggerEvent('skinchanger:loadClothes', skin, uniform)
-					else
-						setUniform(grade, playerPed)
-					end
-				end)
-
-			elseif action == 'freemode_ped' then
-				xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
-					local modelHash
-
-					if skin.sex == 0 then
-						modelHash = joaat(data.current.maleModel)
-					else
-						modelHash = joaat(data.current.femaleModel)
-					end
-
-					xLib.streaming.requestModel(modelHash, function()
-						SetPlayerModel(PlayerId(), modelHash)
-						SetModelAsNoLongerNeeded(modelHash)
-						SetPedDefaultComponentVariation(PlayerPedId())
-
-						TriggerEvent('esx:restoreLoadout')
-					end)
-				end)
-			end
-		end, function(data, menu)
-			menu.close()
-			CurrentAction = 'menu_cloakroom'
-			CurrentActionMsg = TranslateCap('open_cloackroom')
+			CurrentAction = nil
 			CurrentActionData = {}
-		end)
-	end, 'police')
-end
-
+		end
+	end
+})
 
 local function markVehicleImpounded(vehicle)
 	if not DoesEntityExist(vehicle) then
