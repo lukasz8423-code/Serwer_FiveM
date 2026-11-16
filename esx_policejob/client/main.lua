@@ -19,8 +19,25 @@ local function vehicleExists(vehicle)
 end
 
 local function isOffDuty()
-	return ESX.PlayerData.job and ESX.PlayerData.job.onDuty == false
+	return (LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == false)
+		or (ESX.PlayerData.job and ESX.PlayerData.job.onDuty == false)
 end
+
+RegisterNetEvent('esx_policejob:dutyStarted', function(grade)
+	Wait(500)
+	setUniform(grade or 'recruit', PlayerPedId())
+	ESX.ShowNotification('Rozpoczęto służbę. Otrzymujesz wyposażenie policyjne.')
+end)
+
+RegisterNetEvent('esx_policejob:dutyEnded', function()
+	xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
+		if type(skin) == 'table' then
+			TriggerEvent('skinchanger:loadSkin', skin)
+			TriggerEvent('esx:restoreLoadout')
+		end
+	end)
+	ESX.ShowNotification('Zakończono służbę. Zdjęto mundur.')
+end)
 
 local function getPoliceActionVehicle()
 	local vehicle = xLib.game.getVehicleInDirection()
@@ -1369,6 +1386,39 @@ CreateThread(function()
 	end
 end)
 
+-- Reception: start/end police duty. Kept separate from the cloakroom and vehicle garage.
+CreateThread(function()
+	local reception = vector3(441.2, -981.9, 30.6)
+	while true do
+		local waitTime = 1000
+		local ped = PlayerPedId()
+		local distance = #(GetEntityCoords(ped) - reception)
+		if distance < 15.0 then
+			waitTime = 0
+			DrawMarker(1, reception.x, reception.y, reception.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.65, 0.65, 0.35, 40, 120, 220, 150, false, true, 2, false, nil, nil, false)
+			if distance < 1.5 and not CurrentAction then
+				CurrentAction = 'menu_duty'
+				local job = ESX.PlayerData.job
+				if job and job.name == 'police' and not isOffDuty() then
+					CurrentActionMsg = 'Naciśnij E, aby zakończyć służbę'
+				else
+					CurrentActionMsg = 'Naciśnij E, aby rozpocząć służbę'
+				end
+				CurrentActionData = {}
+			elseif distance >= 1.8 and CurrentAction == 'menu_duty' then
+				CurrentAction = nil
+				CurrentActionMsg = nil
+				CurrentActionData = {}
+			end
+		elseif CurrentAction == 'menu_duty' then
+			CurrentAction = nil
+			CurrentActionMsg = nil
+			CurrentActionData = {}
+		end
+		Wait(waitTime)
+	end
+end)
+
 xLib.addKeybind({
 	name = "police:interact",
 	description = "(ESX PoliceJob) " .. TranslateCap('interaction'),
@@ -1376,6 +1426,14 @@ xLib.addKeybind({
 	defaultKey = "E",
 	onPressed = function()
 		if not CurrentAction then
+			return
+		end
+
+		if CurrentAction == 'menu_duty' then
+			TriggerServerEvent('esx_policejob:toggleDuty')
+			CurrentAction = nil
+			CurrentActionMsg = nil
+			CurrentActionData = {}
 			return
 		end
 
