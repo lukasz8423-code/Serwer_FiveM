@@ -70,156 +70,147 @@ function setUniform(uniform, playerPed)
 end
 
 function OpenCloakroomMenu()
-	if not Config.EnableESXService then
-		ESX.ShowNotification('System służby jest wyłączony w konfiguracji.')
-		return
-	end
-
 	local playerPed = PlayerPedId()
 	local grade = ESX.PlayerData.job.grade_name
 
-	xLib.callback('esx_service:isInService', false, function(isInService)
-		playerInService = isInService
+	local elements = {
+		{label = TranslateCap('citizen_wear'), value = 'citizen_wear'},
+		{label = TranslateCap('bullet_wear'), uniform = 'bullet_wear'},
+		{label = TranslateCap('gilet_wear'), uniform = 'gilet_wear'},
+		{label = TranslateCap('police_wear'), value = 'police_wear'}
+	}
 
-		local elements = {}
-
-		if not isInService then
+	if Config.EnableCustomPeds then
+		for k,v in ipairs(Config.CustomPeds.shared) do
 			elements[#elements+1] = {
-				label = 'Rozpocznij służbę',
-				value = 'start_service'
+				label = v.label, 
+				value = 'freemode_ped', 
+				maleModel = v.maleModel, 
+				femaleModel = v.femaleModel
 			}
-		else
-			elements[#elements+1] = {
-				label = 'Zakończ służbę',
-				value = 'end_service'
-			}
+		end
 
+		for k,v in ipairs(Config.CustomPeds[grade]) do
 			elements[#elements+1] = {
-				label = TranslateCap('bullet_wear'),
-				uniform = 'bullet_wear'
+				label = v.label, 
+				value = 'freemode_ped', 
+				maleModel = v.maleModel, 
+				femaleModel = v.femaleModel
 			}
+		end
+	end
 
-			elements[#elements+1] = {
-				label = TranslateCap('gilet_wear'),
-				uniform = 'gilet_wear'
-			}
+	OpenPoliceMenu('default', 'cloakroom', TranslateCap("cloakroom"), elements, function(data, menu)
+		cleanPlayer(playerPed)
 
-			elements[#elements+1] = {
-				label = TranslateCap('police_wear'),
-				value = 'police_wear'
-			}
-
+		if data.current.value == 'citizen_wear' then
 			if Config.EnableCustomPeds then
-				for _, v in ipairs(Config.CustomPeds.shared or {}) do
-					elements[#elements+1] = {
-						label = v.label,
-						value = 'freemode_ped',
-						maleModel = v.maleModel,
-						femaleModel = v.femaleModel
-					}
-				end
+				xLib.callback('esx_skin:getPlayerSkin', false, function(skin, jobSkin)
+					local isMale = skin.sex == 0
 
-				for _, v in ipairs(Config.CustomPeds[grade] or {}) do
-					elements[#elements+1] = {
-						label = v.label,
-						value = 'freemode_ped',
-						maleModel = v.maleModel,
-						femaleModel = v.femaleModel
-					}
-				end
+					TriggerEvent('skinchanger:loadDefaultModel', isMale, function()
+						xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
+							TriggerEvent('skinchanger:loadSkin', skin)
+							TriggerEvent('esx:restoreLoadout')
+						end)
+					end)
+
+				end)
+			else
+				xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
+					TriggerEvent('skinchanger:loadSkin', skin)
+				end)
+			end
+
+			if Config.EnableESXService then
+				xLib.callback('esx_service:isInService', false, function(isInService)
+					if isInService then
+						playerInService = false
+
+						xLib.callback('esx_service:disableService', false, function(disabled)
+							if disabled then
+								ESX.ShowNotification(TranslateCap('service_out'))
+							end
+						end, 'police')
+					end
+				end, 'police')
 			end
 		end
 
-		OpenPoliceMenu('default', 'cloakroom', TranslateCap('cloakroom'), elements, function(data, menu)
-			local action = data.current.value
+		if Config.EnableESXService and data.current.value ~= 'citizen_wear' then
+			local awaitService
 
-			if action == 'start_service' then
-				menu.close()
+			xLib.callback('esx_service:isInService', false, function(isInService)
+				if not isInService then
 
-				xLib.callback('esx_service:enableService', false, function(canTakeService, maxInService, inServiceCount)
-					if not canTakeService then
-						ESX.ShowNotification(TranslateCap('service_max', inServiceCount, maxInService))
-						return
-					end
-
-					playerInService = true
-					ESX.ShowNotification(TranslateCap('service_in'))
-					OpenCloakroomMenu()
-				end, 'police')
-
-				return
-			end
-
-			if action == 'end_service' then
-				menu.close()
-
-				xLib.callback('esx_service:disableService', false, function(disabled)
-					if not disabled then
-						ESX.ShowNotification('Nie udało się zakończyć służby.')
-						return
-					end
-
-					playerInService = false
-
-					xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
-						if Config.EnableCustomPeds then
-							local isMale = skin.sex == 0
-
-							TriggerEvent('skinchanger:loadDefaultModel', isMale, function()
-								xLib.callback('esx_skin:getPlayerSkin', false, function(defaultSkin)
-									TriggerEvent('skinchanger:loadSkin', defaultSkin)
-									TriggerEvent('esx:restoreLoadout')
-								end)
-							end)
+					xLib.callback('esx_service:enableService', false, function(canTakeService, maxInService, inServiceCount)
+						if not canTakeService then
+							awaitService = false
+							ESX.ShowNotification(TranslateCap('service_max', inServiceCount, maxInService))
 						else
-							TriggerEvent('skinchanger:loadSkin', skin)
+							awaitService = true
+							playerInService = true
+							ESX.ShowNotification(TranslateCap('service_in'))
 						end
-					end)
+					end, 'police')
 
-					ESX.ShowNotification(TranslateCap('service_out'))
-				end, 'police')
+				else
+					awaitService = true
+				end
+			end, 'police')
 
+			while awaitService == nil do
+				Wait(0)
+			end
+
+			-- if we couldn't enter service don't let the player get changed
+			if not awaitService then
 				return
 			end
+		end
 
-			cleanPlayer(playerPed)
+		if data.current.uniform then
+			setUniform(data.current.uniform, playerPed)
+		elseif data.current.value == 'police_wear' then
+			xLib.callback('esx_skin:getPlayerSkin', false, function(skin, jobSkin)
+				if type(skin) ~= 'table' then
+					setUniform(grade, playerPed)
+					return
+				end
 
-			if data.current.uniform then
-				setUniform(data.current.uniform, playerPed)
-			elseif action == 'police_wear' then
-				xLib.callback('esx_skin:getPlayerSkin', false, function(skin, jobSkin)
-					if type(skin) ~= 'table' then
-						setUniform(grade, playerPed)
-						return
-					end
+				local uniform = jobSkin and (skin.sex == 0 and jobSkin.skin_male or jobSkin.skin_female)
 
-					local uniform = jobSkin and (skin.sex == 0 and jobSkin.skin_male or jobSkin.skin_female)
+				if type(uniform) == 'table' and next(uniform) then
+					TriggerEvent('skinchanger:loadClothes', skin, uniform)
+				else
+					setUniform(grade, playerPed)
+				end
+			end)
+		elseif data.current.value == 'freemode_ped' then
+			local modelHash
 
-					if type(uniform) == 'table' and next(uniform) then
-						TriggerEvent('skinchanger:loadClothes', skin, uniform)
-					else
-						setUniform(grade, playerPed)
-					end
+			xLib.callback('esx_skin:getPlayerSkin', false, function(skin, jobSkin)
+				if skin.sex == 0 then
+					modelHash = joaat(data.current.maleModel)
+				else
+					modelHash = joaat(data.current.femaleModel)
+				end
+
+				xLib.streaming.requestModel(modelHash, function()
+					SetPlayerModel(PlayerId(), modelHash)
+					SetModelAsNoLongerNeeded(modelHash)
+					SetPedDefaultComponentVariation(PlayerPedId())
+
+					TriggerEvent('esx:restoreLoadout')
 				end)
-			elseif action == 'freemode_ped' then
-				xLib.callback('esx_skin:getPlayerSkin', false, function(skin)
-					local modelHash = skin.sex == 0 and joaat(data.current.maleModel) or joaat(data.current.femaleModel)
-
-					xLib.streaming.requestModel(modelHash, function()
-						SetPlayerModel(PlayerId(), modelHash)
-						SetModelAsNoLongerNeeded(modelHash)
-						SetPedDefaultComponentVariation(PlayerPedId())
-						TriggerEvent('esx:restoreLoadout')
-					end)
-				end)
-			end
-		end, function(data, menu)
-			menu.close()
-			CurrentAction = 'menu_cloakroom'
-			CurrentActionMsg = TranslateCap('open_cloackroom')
-			CurrentActionData = {}
-		end)
-	end, 'police')
+			end)
+		end
+	end, function(data, menu)
+		menu.close()
+		CurrentAction     = 'menu_cloakroom'
+		CurrentActionMsg  = TranslateCap('open_cloackroom')
+		CurrentActionData = {}
+	end)
 end
 
 function OpenArmoryMenu(station)
