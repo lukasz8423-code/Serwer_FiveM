@@ -19,8 +19,12 @@ local function vehicleExists(vehicle)
 end
 
 local function isOffDuty()
-	return (LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == false)
-		or (ESX.PlayerData.job and ESX.PlayerData.job.onDuty == false)
+	local dutyState = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty
+	if dutyState ~= nil then
+		return dutyState == false
+	end
+
+	return not (ESX.PlayerData.job and ESX.PlayerData.job.onDuty == true)
 end
 
 RegisterNetEvent('esx_policejob:dutyStarted', function(grade)
