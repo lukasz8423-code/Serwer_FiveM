@@ -1,5 +1,57 @@
 print('[POLICEJOB] CLIENT MAIN LUA ZOSTAL URUCHOMIONY')
 
+-- Reception interaction is registered first, independently of the police-only marker loop.
+CreateThread(function()
+	print('[POLICEJOB] Reception duty thread started')
+	local reception = vector3(441.2, -981.9, 30.6)
+	local interactionDistance = 2.5
+	local markerDistance = 25.0
+	local proximityReported = false
+
+	while true do
+		local sleep = 1000
+		local ped = PlayerPedId()
+		local coords = GetEntityCoords(ped)
+		local distance = #(coords - reception)
+
+		if distance < markerDistance then
+			sleep = 0
+			DrawMarker(2, reception.x, reception.y, reception.z + 0.15,
+				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+				0.55, 0.55, 0.55, 40, 120, 220, 220,
+				false, true, 2, false, nil, nil, false)
+
+			if distance < 5.0 and not proximityReported then
+				print(('[POLICEJOB] Reception detected; distance=%.2f; playerZ=%.2f'):format(distance, coords.z))
+				proximityReported = true
+			elseif distance >= 5.0 then
+				proximityReported = false
+			end
+
+			if distance < interactionDistance then
+				local playerData = ESX.GetPlayerData and ESX.GetPlayerData() or ESX.PlayerData
+				local job = playerData and playerData.job
+				local onDuty = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == true
+
+				if job and job.name == 'police' and onDuty then
+					ESX.ShowHelpNotification('Naciśnij ~INPUT_CONTEXT~, aby zakończyć służbę')
+				else
+					ESX.ShowHelpNotification('Naciśnij ~INPUT_CONTEXT~, aby rozpocząć służbę')
+				end
+
+				if IsControlJustReleased(0, 38) then
+					print('[POLICEJOB] Reception E pressed; sending toggleDuty')
+					TriggerServerEvent('esx_policejob:toggleDuty')
+					Wait(750)
+				end
+			end
+		end
+
+		Wait(sleep)
+	end
+end)
+
+
 -- SPDX-License-Identifier: GPL-3.0-only
 -- Copyright (C) 2022-2026 ESX Framework
 
@@ -1392,51 +1444,6 @@ CreateThread(function()
 	end
 end)
 
--- Police reception duty interaction.
--- Kept in main.lua so it runs with the core police client script.
-CreateThread(function()
-	local reception = vector3(441.2, -981.9, 30.6)
-	local interactionDistance = 2.0
-	local markerDistance = 20.0
-
-	while true do
-		local sleep = 1000
-		local ped = PlayerPedId()
-		local coords = GetEntityCoords(ped)
-		local distance = #(coords - reception)
-
-		if distance < markerDistance then
-			sleep = 0
-			DrawMarker(
-				2,
-				reception.x, reception.y, reception.z + 0.15,
-				0.0, 0.0, 0.0,
-				0.0, 0.0, 0.0,
-				0.45, 0.45, 0.45,
-				40, 120, 220, 220,
-				false, true, 2, false, nil, nil, false
-			)
-
-			if distance < interactionDistance then
-				local job = ESX.PlayerData and ESX.PlayerData.job
-				local onDuty = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == true
-
-				if job and job.name == 'police' and onDuty then
-					ESX.ShowHelpNotification('Naciśnij ~INPUT_CONTEXT~, aby zakończyć służbę')
-				else
-					ESX.ShowHelpNotification('Naciśnij ~INPUT_CONTEXT~, aby rozpocząć służbę')
-				end
-
-				if IsControlJustReleased(0, 38) then
-					TriggerServerEvent('esx_policejob:toggleDuty')
-					Wait(750)
-				end
-			end
-		end
-
-		Wait(sleep)
-	end
-end)
 
 
 xLib.addKeybind({
