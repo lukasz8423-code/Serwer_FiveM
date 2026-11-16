@@ -1390,38 +1390,7 @@ CreateThread(function()
 	end
 end)
 
--- Reception: start/end police duty. Kept separate from the cloakroom and vehicle garage.
-CreateThread(function()
-	local reception = vector3(441.2, -981.9, 30.6)
-	while true do
-		local waitTime = 1000
-		local ped = PlayerPedId()
-		local distance = #(GetEntityCoords(ped) - reception)
-		if distance < 15.0 then
-			waitTime = 0
-			DrawMarker(1, reception.x, reception.y, reception.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.65, 0.65, 0.35, 40, 120, 220, 150, false, true, 2, false, nil, nil, false)
-			if distance < 1.5 and not CurrentAction then
-				CurrentAction = 'menu_duty'
-				local job = ESX.PlayerData.job
-				if job and job.name == 'police' and not isOffDuty() then
-					CurrentActionMsg = 'Naciśnij E, aby zakończyć służbę'
-				else
-					CurrentActionMsg = 'Naciśnij E, aby rozpocząć służbę'
-				end
-				CurrentActionData = {}
-			elseif distance >= 1.8 and CurrentAction == 'menu_duty' then
-				CurrentAction = nil
-				CurrentActionMsg = nil
-				CurrentActionData = {}
-			end
-		elseif CurrentAction == 'menu_duty' then
-			CurrentAction = nil
-			CurrentActionMsg = nil
-			CurrentActionData = {}
-		end
-		Wait(waitTime)
-	end
-end)
+-- Reception duty interaction is handled by client/duty.lua.
 
 xLib.addKeybind({
 	name = "police:interact",
