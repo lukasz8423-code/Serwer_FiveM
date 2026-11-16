@@ -4,7 +4,9 @@
 ESXCatalog.awaitReady()
 
 if Config.EnableESXService then
-    TriggerEvent('esx_service:activateService', 'police', Config.MaxInService)
+    if Config.MaxInService ~= -1 then
+        TriggerEvent('esx_service:activateService', 'police', Config.MaxInService)
+    end
 end
 
 TriggerEvent('esx_phone:registerNumber', 'police', TranslateCap('alert_police'), true, true)
