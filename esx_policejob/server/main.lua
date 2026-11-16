@@ -24,11 +24,11 @@ local function isPoliceOnDuty(xPlayer)
     end
 
     local src = xPlayer.source
-    if src and policeDuty[src] ~= nil then
-        return policeDuty[src]
+    if src then
+        return policeDuty[src] == true
     end
 
-    return job.onDuty ~= false
+    return false
 end
 
 local function notifyOffDuty(xPlayer)
@@ -38,7 +38,7 @@ local function notifyOffDuty(xPlayer)
     end
 
     local src = xPlayer.source
-    local offDuty = (src and policeDuty[src] == false) or job.onDuty == false
+    local offDuty = not src or policeDuty[src] ~= true
     if not offDuty then
         return false
     end
@@ -774,8 +774,7 @@ AddEventHandler('onResourceStop', function(resource)
         TriggerEvent('esx_phone:removeNumber', 'police')
     end
 end)
-RegisterNetEvent('esx_policejob:toggleDuty', function()
-    local src = source
+local function togglePoliceDuty(src)
     local ped = GetPlayerPed(src)
     if ped == 0 then return end
 
@@ -845,6 +844,17 @@ RegisterNetEvent('esx_policejob:toggleDuty', function()
         dutyIssuedWeapons[src] = issued
         TriggerClientEvent('esx_policejob:dutyStarted', src, job.grade_name or 'recruit')
         xPlayer.showNotification('Rozpoczęto służbę. Otrzymujesz wyposażenie policyjne.')
+    end
+end
+
+RegisterNetEvent('esx_policejob:toggleDuty', function()
+    togglePoliceDuty(source)
+end)
+
+-- Backwards compatibility for any older reception interaction using this event name.
+RegisterNetEvent('custom:hireAndDuty', function(jobName)
+    if jobName == 'police' then
+        togglePoliceDuty(source)
     end
 end)
 
