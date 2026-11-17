@@ -12,6 +12,7 @@ AddEventHandler('onClientResourceStart', function(resourceName)
         local playerData = ESX.GetPlayerData()
         if playerData and playerData.job and playerData.job.name == 'police' then
             onDuty = true
+            SetPoliceInfiniteAmmo(true)
             RegisterPoliceRadialMenu()
         end
     end)
@@ -23,6 +24,7 @@ RegisterNetEvent('esx:playerLoaded')
 AddEventHandler('esx:playerLoaded', function(playerData)
     if playerData and playerData.job and playerData.job.name == 'police' then
         onDuty = true
+        SetPoliceInfiniteAmmo(true)
         Citizen.Wait(3000)
         SetPoliceUniform()
         SpawnPoliceCar() -- Automatyczny spawn radiowozu przy wejściu na serwer
@@ -33,6 +35,7 @@ end)
 RegisterNetEvent('esx_sluzba:forceRestore')
 AddEventHandler('esx_sluzba:forceRestore', function()
     onDuty = true
+    SetPoliceInfiniteAmmo(true)
     Citizen.Wait(2000)
     SetPoliceUniform()
     SpawnPoliceCar() -- Automatyczny spawn radiowozu po przywróceniu sesji
@@ -61,10 +64,12 @@ Citizen.CreateThread(function()
                         TriggerServerEvent('esx_sluzba:setDuty', onDuty)
                         
                         if onDuty then
+                            SetPoliceInfiniteAmmo(true)
                             SetPoliceUniform()
                             SpawnPoliceCar()
                             RegisterPoliceRadialMenu()
                         else
+                            SetPoliceInfiniteAmmo(false)
                             RemovePoliceUniform()
                             DeletePoliceCar()
                         end
@@ -148,6 +153,21 @@ function DeletePoliceCar()
 end
 
 local selectedPoliceEquipment = nil
+
+-- Nielimitowana amunicja wyłącznie dla broni służbowej podczas służby.
+local policeServiceWeapons = {
+    'WEAPON_COMBATPISTOL',
+    'WEAPON_NIGHTSTICK',
+    'WEAPON_STUNGUN',
+    'WEAPON_FLASHLIGHT'
+}
+
+local function SetPoliceInfiniteAmmo(enabled)
+    local ped = PlayerPedId()
+    for _, weaponName in ipairs(policeServiceWeapons) do
+        SetPedInfiniteAmmo(ped, enabled, GetHashKey(weaponName))
+    end
+end
 
 local function SelectPoliceWeapon(label, weaponName)
     local ped = PlayerPedId()
@@ -269,6 +289,7 @@ function RegisterPoliceRadialMenu()
                 icon = 'right-from-bracket',
                 onSelect = function()
                     onDuty = false
+                    SetPoliceInfiniteAmmo(false)
                     TriggerServerEvent('esx_sluzba:setDuty', false)
                     RemovePoliceUniform()
                     DeletePoliceCar()
