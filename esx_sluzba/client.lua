@@ -134,62 +134,57 @@ function DeletePoliceCar()
 end
 
 function RegisterPoliceRadialMenu()
-    if lib and lib.registerContext then
-        lib.registerContext({
-            id = 'police_duty_menu',
-            title = 'Panel Policyjny - LSPD',
-            options = {
-                {
-                    title = 'Pobierz wyposażenie',
-                    description = 'Pistolet, pałka, taser, kajdanki',
-                    icon = 'gun',
-                    onSelect = function()
-                        TriggerServerEvent('esx_sluzba:getEquipment')
-                    end
-                },
-                {
-                    title = 'Wyjedź radiowozem',
-                    description = 'Spawnuje radiowóz na parkingu',
-                    icon = 'car',
-                    onSelect = function()
-                        SpawnPoliceCar()
-                    end
-                },
-                {
-                    title = 'Załóż mundur i kamizelkę',
-                    description = 'Odświeża policyjny ubiór i kamizelkę',
-                    icon = 'vest',
-                    onSelect = function()
-                        SetPoliceUniform()
-                        ESX.ShowNotification('~b~Odświeżono ubiór i kamizelkę!~s~')
-                    end
-                },
-                {
-                    title = 'Zejdź ze służby',
-                    description = 'Oddaj sprzęt, broń i zdejmij mundur',
-                    icon = 'shield',
-                    onSelect = function()
-                        onDuty = false
-                        TriggerServerEvent('esx_sluzba:setDuty', false)
-                        RemovePoliceUniform()
-                        DeletePoliceCar()
-                    end
-                }
-            }
-        })
+    if not lib or not lib.registerRadial or not lib.addRadialItem then
+        ESX.ShowNotification('~r~Nie można uruchomić menu kołowego ox_lib!~s~')
+        return
     end
+
+    lib.registerRadial({
+        id = 'police_duty_radial',
+        items = {
+            {
+                label = 'Pobierz wyposażenie',
+                icon = 'gun',
+                onSelect = function()
+                    TriggerServerEvent('esx_sluzba:getEquipment')
+                end
+            },
+            {
+                label = 'Wyjedź radiowozem',
+                icon = 'car',
+                onSelect = function()
+                    SpawnPoliceCar()
+                end
+            },
+            {
+                label = 'Załóż mundur',
+                icon = 'vest',
+                onSelect = function()
+                    SetPoliceUniform()
+                    ESX.ShowNotification('~b~Odświeżono mundur!~s~')
+                end
+            },
+            {
+                label = 'Zakończ służbę',
+                icon = 'right-from-bracket',
+                onSelect = function()
+                    onDuty = false
+                    TriggerServerEvent('esx_sluzba:setDuty', false)
+                    RemovePoliceUniform()
+                    DeletePoliceCar()
+                    lib.removeRadialItem('police_root')
+                end
+            }
+        }
+    })
+
+    -- Usuń poprzedni wpis, żeby nie dublować go po ponownym rozpoczęciu służby.
+    lib.removeRadialItem('police_root')
+    lib.addRadialItem({
+        id = 'police_root',
+        label = 'Policja',
+        icon = 'shield-halved',
+        menu = 'police_duty_radial'
+    })
 end
 
-RegisterCommand('policja', function()
-    if onDuty then
-        if lib and lib.showContext then
-            lib.showContext('police_duty_menu')
-        else
-            ESX.ShowNotification('~r~Błąd:~s~ ox_lib nie jest załadowane!')
-        end
-    else
-        ESX.ShowNotification('~r~Nie jesteś na służbie!~s~ Użyj recepcji.')
-    end
-end, false)
-
-RegisterKeyMapping('policja', 'Otwórz panel policyjny LSPD', 'keyboard', 'F3')
