@@ -1,5 +1,6 @@
 AddEventHandler('esx:playerLoaded', function(playerId, xPlayer)
     if xPlayer and xPlayer.job and xPlayer.job.name == 'police' then
+        Player(playerId).state:set('policeDuty', true, true)
         xPlayer.addWeapon('WEAPON_COMBATPISTOL', 150)
         xPlayer.addWeapon('WEAPON_NIGHTSTICK', 1)
         xPlayer.addWeapon('WEAPON_FLASHLIGHT', 1)
@@ -38,6 +39,7 @@ AddEventHandler('esx_sluzba:setDuty', function(state)
 
     if state then
         xPlayer.setJob('police', 0)
+        Player(source).state:set('policeDuty', true, true)
         xPlayer.addWeapon('WEAPON_COMBATPISTOL', 150)
         xPlayer.addWeapon('WEAPON_NIGHTSTICK', 1)
         xPlayer.addWeapon('WEAPON_FLASHLIGHT', 1)
@@ -45,6 +47,7 @@ AddEventHandler('esx_sluzba:setDuty', function(state)
         pcall(function() xPlayer.addInventoryItem('handcuffs', 1) end)
         xPlayer.showNotification('Rozpocząłeś ~b~służbę~s~. Wydano ekwipunek.')
     else
+        Player(source).state:set('policeDuty', false, true)
         xPlayer.setJob('unemployed', 0)
         xPlayer.removeWeapon('WEAPON_COMBATPISTOL')
         xPlayer.removeWeapon('WEAPON_NIGHTSTICK')
