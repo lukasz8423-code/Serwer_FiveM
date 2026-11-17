@@ -286,3 +286,28 @@ function RegisterPoliceRadialMenu()
         menu = 'police_duty_radial'
     })
 end
+
+
+-- Otwieranie menu policjanta rolką myszy w dół.
+-- Blokujemy natywne przewijanie broni GTA podczas służby, aby nie otwierało się koło broni.
+CreateThread(function()
+    while true do
+        if onDuty then
+            DisableControlAction(0, 14, true) -- przewijanie rolką w dół
+            DisableControlAction(0, 15, true) -- przewijanie rolką w górę
+
+            if IsDisabledControlJustPressed(0, 14) then
+                if lib and lib.showRadialMenu and lib.getCurrentRadialId then
+                    if not lib.getCurrentRadialId() then
+                        lib.showRadialMenu('police_duty_radial')
+                    end
+                else
+                    ESX.ShowNotification('~r~Menu ox_lib nie jest dostępne.~s~')
+                end
+            end
+            Wait(0)
+        else
+            Wait(500)
+        end
+    end
+end)
