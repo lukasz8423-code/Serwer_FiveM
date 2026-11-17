@@ -133,6 +133,22 @@ function DeletePoliceCar()
     end
 end
 
+local selectedPoliceEquipment = nil
+
+local function SelectPoliceWeapon(label, weaponName)
+    local ped = PlayerPedId()
+    local weaponHash = GetHashKey(weaponName)
+
+    if not HasPedGotWeapon(ped, weaponHash, false) then
+        ESX.ShowNotification('~r~Nie masz tego wyposażenia. Zgłoś się po nie do zbrojowni.~s~')
+        return
+    end
+
+    SetCurrentPedWeapon(ped, weaponHash, true)
+    selectedPoliceEquipment = label
+    ESX.ShowNotification('Wybrano: ~b~' .. label .. '~s~')
+end
+
 function RegisterPoliceRadialMenu()
     if not lib or not lib.registerRadial or not lib.addRadialItem then
         ESX.ShowNotification('~r~Nie można uruchomić menu kołowego ox_lib!~s~')
@@ -140,14 +156,55 @@ function RegisterPoliceRadialMenu()
     end
 
     lib.registerRadial({
+        id = 'police_equipment_radial',
+        items = {
+            {
+                label = 'Pistolet służbowy',
+                icon = 'gun',
+                onSelect = function()
+                    SelectPoliceWeapon('Pistolet służbowy', 'WEAPON_COMBATPISTOL')
+                end
+            },
+            {
+                label = 'Pałka policyjna',
+                icon = 'wand-magic-sparkles',
+                onSelect = function()
+                    SelectPoliceWeapon('Pałka policyjna', 'WEAPON_NIGHTSTICK')
+                end
+            },
+            {
+                label = 'Taser',
+                icon = 'bolt',
+                onSelect = function()
+                    SelectPoliceWeapon('Taser', 'WEAPON_STUNGUN')
+                end
+            },
+            {
+                label = 'Latarka',
+                icon = 'flashlight',
+                onSelect = function()
+                    SelectPoliceWeapon('Latarka', 'WEAPON_FLASHLIGHT')
+                end
+            },
+            {
+                label = 'Kajdanki',
+                icon = 'handcuffs',
+                onSelect = function()
+                    selectedPoliceEquipment = 'Kajdanki'
+                    SetCurrentPedWeapon(PlayerPedId(), GetHashKey('WEAPON_UNARMED'), true)
+                    ESX.ShowNotification('Wybrano: ~b~Kajdanki~s~. Podepnę ich użycie do akcji zakuwania w kolejnym kroku.')
+                end
+            }
+        }
+    })
+
+    lib.registerRadial({
         id = 'police_duty_radial',
         items = {
             {
-                label = 'Pobierz wyposażenie',
-                icon = 'gun',
-                onSelect = function()
-                    TriggerServerEvent('esx_sluzba:getEquipment')
-                end
+                label = 'Wyposażenie policjanta',
+                icon = 'toolbox',
+                menu = 'police_equipment_radial'
             },
             {
                 label = 'Wyjedź radiowozem',
@@ -178,7 +235,6 @@ function RegisterPoliceRadialMenu()
         }
     })
 
-    -- Usuń poprzedni wpis, żeby nie dublować go po ponownym rozpoczęciu służby.
     lib.removeRadialItem('police_root')
     lib.addRadialItem({
         id = 'police_root',
@@ -187,4 +243,3 @@ function RegisterPoliceRadialMenu()
         menu = 'police_duty_radial'
     })
 end
-
