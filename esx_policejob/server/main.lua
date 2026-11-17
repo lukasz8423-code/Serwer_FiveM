@@ -25,7 +25,8 @@ local function isPoliceOnDuty(xPlayer)
 
     local src = xPlayer.source
     if src then
-        return policeDuty[src] == true
+        local playerState = Player(src).state
+        return policeDuty[src] == true or playerState.policeDuty == true
     end
 
     return false
