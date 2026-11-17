@@ -19,115 +19,151 @@ end
 
 local receptionCoords = vector3(441.79, -982.07, 30.69)
 
--- Rejestracja menu również wtedy, gdy zasób wystartuje po zalogowaniu gracza.
+local restoringDuty = false
+
+local function RestorePoliceDuty()
+    if restoringDuty then return end
+    restoringDuty = true
+    onDuty = true
+    SetPoliceInfiniteAmmo(true)
+
+    CreateThread(function()
+        Wait(1000)
+        SetPoliceUniform()
+        SpawnPoliceCar()
+        RegisterPoliceRadialMenu()
+        restoringDuty = false
+    end)
+end
+
+-- Główne przywracanie wysyła serwer po załadowaniu postaci.
+-- Ten fallback obsługuje restart samego zasobu, gdy gracz jest już na serwerze.
 AddEventHandler('onClientResourceStart', function(resourceName)
     if resourceName ~= GetCurrentResourceName() then return end
 
     CreateThread(function()
-        Wait(1500)
+        Wait(2500)
         local playerData = ESX.GetPlayerData()
-        if playerData and playerData.job and playerData.job.name == 'police' then
-            onDuty = true
-            SetPoliceInfiniteAmmo(true)
-            RegisterPoliceRadialMenu()
+        local dutyState = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty
+        if playerData and playerData.job and playerData.job.name == 'police' and dutyState ~= false then
+            RestorePoliceDuty()
         end
     end)
 end)
-local parkingCoords = vector3(441.20, -1017.50, 28.60)
-local parkingHeading = 90.0
 
-RegisterNetEvent('esx:playerLoaded')
-AddEventHandler('esx:playerLoaded', function(playerData)
-    if playerData and playerData.job and playerData.job.name == 'police' then
-        onDuty = true
-        SetPoliceInfiniteAmmo(true)
-        Citizen.Wait(3000)
-        SetPoliceUniform()
-        SpawnPoliceCar() -- Automatyczny spawn radiowozu przy wejściu na serwer
-        RegisterPoliceRadialMenu()
+RegisterNetEvent('esx_sluzba:forceRestore', RestorePoliceDuty)
+
+RegisterNetEvent('esx_sluzba:dutyEnded', function()
+    onDuty = false
+    SetPoliceInfiniteAmmo(false)
+    RemovePoliceUniform()
+    DeletePoliceCar()
+    if lib and lib.removeRadialItem then
+        lib.removeRadialItem('police_root')
     end
 end)
 
-RegisterNetEvent('esx_sluzba:forceRestore')
-AddEventHandler('esx_sluzba:forceRestore', function()
-    onDuty = true
-    SetPoliceInfiniteAmmo(true)
-    Citizen.Wait(2000)
-    SetPoliceUniform()
-    SpawnPoliceCar() -- Automatyczny spawn radiowozu po przywróceniu sesji
-    RegisterPoliceRadialMenu()
-end)
+local parkingCoords = vector3(441.20, -1017.50, 28.60)
+local parkingHeading = 90.0
 
 Citizen.CreateThread(function()
     while true do
         local sleep = 1000
-        local playerPed = PlayerPedId()
-        
-        if DoesEntityExist(playerPed) then
-            local coords = GetEntityCoords(playerPed)
-            local dist = #(coords - receptionCoords)
+        local playerData = ESX and ESX.GetPlayerData()
+        local isPolice = playerData and playerData.job and playerData.job.name == 'police'
 
-            if dist < 10.0 then
-                sleep = 0
-                DrawMarker(1, receptionCoords.x, receptionCoords.y, receptionCoords.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 1.2, 0.5, 0, 100, 255, 150, false, true, 2, false, nil, nil, false)
+        if isPolice then
+            local playerPed = PlayerPedId()
+            if DoesEntityExist(playerPed) then
+                local coords = GetEntityCoords(playerPed)
+                local dist = #(coords - receptionCoords)
 
-                if dist < 1.5 then
-                    local text = onDuty and 'Naciśnij ~INPUT_CONTEXT~ aby ~r~zakończyć~s~ służbę' or 'Naciśnij ~INPUT_CONTEXT~ aby ~b~rozpocząć~s~ służbę'
-                    ESX.ShowHelpNotification(text)
+                if dist < 10.0 then
+                    sleep = 0
+                    DrawMarker(1, receptionCoords.x, receptionCoords.y, receptionCoords.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 1.2, 0.5, 0, 100, 255, 150, false, true, 2, false, nil, nil, false)
 
-                    if IsControlJustReleased(0, 38) then
-                        onDuty = not onDuty
-                        TriggerServerEvent('esx_sluzba:setDuty', onDuty)
-                        
-                        if onDuty then
-                            SetPoliceInfiniteAmmo(true)
-                            SetPoliceUniform()
-                            SpawnPoliceCar()
-                            RegisterPoliceRadialMenu()
-                        else
-                            SetPoliceInfiniteAmmo(false)
-                            RemovePoliceUniform()
-                            DeletePoliceCar()
+                    if dist < 1.5 then
+                        local text = onDuty and 'Naciśnij ~INPUT_CONTEXT~ aby ~r~zakończyć~s~ służbę' or 'Naciśnij ~INPUT_CONTEXT~ aby ~b~rozpocząć~s~ służbę'
+                        ESX.ShowHelpNotification(text)
+
+                        if IsControlJustReleased(0, 38) then
+                            onDuty = not onDuty
+                            TriggerServerEvent('esx_sluzba:setDuty', onDuty)
+
+                            if onDuty then
+                                SetPoliceInfiniteAmmo(true)
+                                -- Serwer potwierdza rozpoczęcie i wywołuje forceRestore.
+                            else
+                                SetPoliceInfiniteAmmo(false)
+                                RemovePoliceUniform()
+                                DeletePoliceCar()
+                                if lib and lib.removeRadialItem then
+                                    lib.removeRadialItem('police_root')
+                                end
+                            end
+                            Wait(1000)
                         end
-                        Citizen.Wait(1000)
                     end
                 end
             end
         end
-        Citizen.Wait(sleep)
+        Wait(sleep)
     end
 end)
 
 function SetPoliceUniform()
-    TriggerEvent('skinchanger:getSkin', function(skin)
-        if not skin then return end
-        local uniform = {}
-        if skin.sex == 0 then -- Facet
-            uniform = {
-                ['tshirt_1'] = 58, ['tshirt_2'] = 0,
-                ['torso_1'] = 55, ['torso_2'] = 0,
-                ['bproof_1'] = 11, ['bproof_2'] = 1, -- Kamizelka zgodna z Config.Uniforms.bullet_wear
-                ['decals_1'] = 0, ['decals_2'] = 0,
-                ['arms'] = 41,
-                ['pants_1'] = 25, ['pants_2'] = 0,
-                ['shoes_1'] = 25, ['shoes_2'] = 0,
-                ['helmet_1'] = -1, ['helmet_2'] = 0,
-                ['chain_1'] = 0, ['chain_2'] = 0
-            }
-        else -- Kobieta
-            uniform = {
-                ['tshirt_1'] = 35, ['tshirt_2'] = 0,
-                ['torso_1'] = 48, ['torso_2'] = 0,
-                ['bproof_1'] = 11, ['bproof_2'] = 1,
-                ['decals_1'] = 0, ['decals_2'] = 0,
-                ['arms'] = 44,
-                ['pants_1'] = 34, ['pants_2'] = 0,
-                ['shoes_1'] = 27, ['shoes_2'] = 0,
-                ['helmet_1'] = -1, ['helmet_2'] = 0,
-                ['chain_1'] = 0, ['chain_2'] = 0
-            }
+    CreateThread(function()
+        for attempt = 1, 20 do
+            if GetResourceState('skinchanger') == 'started' then
+                local skin, received = nil, false
+                TriggerEvent('skinchanger:getSkin', function(currentSkin)
+                    skin = currentSkin
+                    received = true
+                end)
+
+                local timeout = GetGameTimer() + 2500
+                while not received and GetGameTimer() < timeout do
+                    Wait(50)
+                end
+
+                if type(skin) == 'table' then
+                    local uniform = {}
+                    if skin.sex == 0 then
+                        uniform = {
+                            ['tshirt_1'] = 58, ['tshirt_2'] = 0,
+                            ['torso_1'] = 55, ['torso_2'] = 0,
+                            ['bproof_1'] = 11, ['bproof_2'] = 1,
+                            ['decals_1'] = 0, ['decals_2'] = 0,
+                            ['arms'] = 41,
+                            ['pants_1'] = 25, ['pants_2'] = 0,
+                            ['shoes_1'] = 25, ['shoes_2'] = 0,
+                            ['helmet_1'] = -1, ['helmet_2'] = 0,
+                            ['chain_1'] = 0, ['chain_2'] = 0
+                        }
+                    else
+                        uniform = {
+                            ['tshirt_1'] = 35, ['tshirt_2'] = 0,
+                            ['torso_1'] = 48, ['torso_2'] = 0,
+                            ['bproof_1'] = 11, ['bproof_2'] = 1,
+                            ['decals_1'] = 0, ['decals_2'] = 0,
+                            ['arms'] = 44,
+                            ['pants_1'] = 34, ['pants_2'] = 0,
+                            ['shoes_1'] = 27, ['shoes_2'] = 0,
+                            ['helmet_1'] = -1, ['helmet_2'] = 0,
+                            ['chain_1'] = 0, ['chain_2'] = 0
+                        }
+                    end
+
+                    TriggerEvent('skinchanger:loadClothes', skin, uniform)
+                    return
+                end
+            end
+            Wait(500)
         end
-        TriggerEvent('skinchanger:loadClothes', skin, uniform)
+
+        if ESX and ESX.ShowNotification then
+            ESX.ShowNotification('~r~Nie udało się załadować skórki do munduru. Sprawdź skinchanger.~s~')
+        end
     end)
 end
 
@@ -140,29 +176,47 @@ function RemovePoliceUniform()
 end
 
 function SpawnPoliceCar()
-    local model = 'police'
-    RequestModel(model)
-    while not HasModelLoaded(model) do
-        Citizen.Wait(10)
-    end
+    CreateThread(function()
+        local modelHash = joaat('police3')
 
-    if DoesEntityExist(serviceVehicle) then
-        DeleteEntity(serviceVehicle)
-    end
+        if serviceVehicle and serviceVehicle ~= 0 and DoesEntityExist(serviceVehicle) then
+            DeleteEntity(serviceVehicle)
+            serviceVehicle = nil
+        end
 
-    local vehicle = CreateVehicle(GetHashKey(model), parkingCoords.x, parkingCoords.y, parkingCoords.z + 0.5, parkingHeading, true, false)
-    SetVehicleNumberPlateText(vehicle, 'LSPD ' .. math.random(100, 999))
-    SetVehicleDirtLevel(vehicle, 0.0)
-    SetVehicleEngineOn(vehicle, true, true, false)
-    SetEntityAsMissionEntity(vehicle, true, true)
-    
-    serviceVehicle = vehicle
-    ESX.ShowNotification('~b~Radiowóz~s~ został podstawiony na parking!')
-    SetModelAsNoLongerNeeded(model)
+        RequestModel(modelHash)
+        local timeout = GetGameTimer() + 15000
+        while not HasModelLoaded(modelHash) and GetGameTimer() < timeout do
+            Wait(50)
+        end
+
+        if not HasModelLoaded(modelHash) then
+            ESX.ShowNotification('~r~Nie udało się załadować modelu radiowozu police3.~s~')
+            return
+        end
+
+        local vehicle = CreateVehicle(modelHash, parkingCoords.x, parkingCoords.y, parkingCoords.z + 0.5, parkingHeading, true, true)
+        if vehicle == 0 or not DoesEntityExist(vehicle) then
+            ESX.ShowNotification('~r~Nie udało się utworzyć radiowozu.~s~')
+            SetModelAsNoLongerNeeded(modelHash)
+            return
+        end
+
+        SetEntityAsMissionEntity(vehicle, true, true)
+        SetVehicleOnGroundProperly(vehicle)
+        SetVehicleNumberPlateText(vehicle, 'LSPD ' .. math.random(100, 999))
+        SetVehicleDirtLevel(vehicle, 0.0)
+        SetVehicleEngineOn(vehicle, true, true, false)
+        SetVehicleDoorsLocked(vehicle, 1)
+
+        serviceVehicle = vehicle
+        ESX.ShowNotification('~b~Radiowóz~s~ został podstawiony na parking!')
+        SetModelAsNoLongerNeeded(modelHash)
+    end)
 end
 
 function DeletePoliceCar()
-    if DoesEntityExist(serviceVehicle) then
+    if serviceVehicle and serviceVehicle ~= 0 and DoesEntityExist(serviceVehicle) then
         DeleteEntity(serviceVehicle)
         serviceVehicle = nil
     end
