@@ -2,6 +2,20 @@ local onDuty = false
 local serviceVehicle = nil
 
 local receptionCoords = vector3(441.79, -982.07, 30.69)
+
+-- Rejestracja menu również wtedy, gdy zasób wystartuje po zalogowaniu gracza.
+AddEventHandler('onClientResourceStart', function(resourceName)
+    if resourceName ~= GetCurrentResourceName() then return end
+
+    CreateThread(function()
+        Wait(1500)
+        local playerData = ESX.GetPlayerData()
+        if playerData and playerData.job and playerData.job.name == 'police' then
+            onDuty = true
+            RegisterPoliceRadialMenu()
+        end
+    end)
+end)
 local parkingCoords = vector3(441.20, -1017.50, 28.60)
 local parkingHeading = 90.0
 
@@ -71,7 +85,7 @@ function SetPoliceUniform()
             uniform = {
                 ['tshirt_1'] = 58, ['tshirt_2'] = 0,
                 ['torso_1'] = 55, ['torso_2'] = 0,
-                ['bproof_1'] = 27, ['bproof_2'] = 0, -- Żółta kamizelka odblaskowa
+                ['bproof_1'] = 11, ['bproof_2'] = 1, -- Kamizelka zgodna z Config.Uniforms.bullet_wear
                 ['decals_1'] = 0, ['decals_2'] = 0,
                 ['arms'] = 41,
                 ['pants_1'] = 25, ['pants_2'] = 0,
@@ -83,7 +97,7 @@ function SetPoliceUniform()
             uniform = {
                 ['tshirt_1'] = 35, ['tshirt_2'] = 0,
                 ['torso_1'] = 48, ['torso_2'] = 0,
-                ['bproof_1'] = 18, ['bproof_2'] = 0,
+                ['bproof_1'] = 11, ['bproof_2'] = 1,
                 ['decals_1'] = 0, ['decals_2'] = 0,
                 ['arms'] = 44,
                 ['pants_1'] = 34, ['pants_2'] = 0,
