@@ -1,6 +1,22 @@
 local onDuty = false
 local serviceVehicle = nil
 
+-- Nielimitowana amunicja wyłącznie dla broni służbowej podczas służby.
+local policeServiceWeapons = {
+    'WEAPON_COMBATPISTOL',
+    'WEAPON_NIGHTSTICK',
+    'WEAPON_STUNGUN',
+    'WEAPON_FLASHLIGHT'
+}
+
+local function SetPoliceInfiniteAmmo(enabled)
+    local ped = PlayerPedId()
+    for _, weaponName in ipairs(policeServiceWeapons) do
+        SetPedInfiniteAmmo(ped, enabled, GetHashKey(weaponName))
+    end
+end
+
+
 local receptionCoords = vector3(441.79, -982.07, 30.69)
 
 -- Rejestracja menu również wtedy, gdy zasób wystartuje po zalogowaniu gracza.
@@ -153,21 +169,6 @@ function DeletePoliceCar()
 end
 
 local selectedPoliceEquipment = nil
-
--- Nielimitowana amunicja wyłącznie dla broni służbowej podczas służby.
-local policeServiceWeapons = {
-    'WEAPON_COMBATPISTOL',
-    'WEAPON_NIGHTSTICK',
-    'WEAPON_STUNGUN',
-    'WEAPON_FLASHLIGHT'
-}
-
-local function SetPoliceInfiniteAmmo(enabled)
-    local ped = PlayerPedId()
-    for _, weaponName in ipairs(policeServiceWeapons) do
-        SetPedInfiniteAmmo(ped, enabled, GetHashKey(weaponName))
-    end
-end
 
 local function SelectPoliceWeapon(label, weaponName)
     local ped = PlayerPedId()
