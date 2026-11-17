@@ -1,0 +1,195 @@
+local onDuty = false
+local serviceVehicle = nil
+
+local receptionCoords = vector3(441.79, -982.07, 30.69)
+local parkingCoords = vector3(441.20, -1017.50, 28.60)
+local parkingHeading = 90.0
+
+RegisterNetEvent('esx:playerLoaded')
+AddEventHandler('esx:playerLoaded', function(playerData)
+    if playerData and playerData.job and playerData.job.name == 'police' then
+        onDuty = true
+        Citizen.Wait(3000)
+        SetPoliceUniform()
+        SpawnPoliceCar() -- Automatyczny spawn radiowozu przy wejściu na serwer
+        RegisterPoliceRadialMenu()
+    end
+end)
+
+RegisterNetEvent('esx_sluzba:forceRestore')
+AddEventHandler('esx_sluzba:forceRestore', function()
+    onDuty = true
+    Citizen.Wait(2000)
+    SetPoliceUniform()
+    SpawnPoliceCar() -- Automatyczny spawn radiowozu po przywróceniu sesji
+    RegisterPoliceRadialMenu()
+end)
+
+Citizen.CreateThread(function()
+    while true do
+        local sleep = 1000
+        local playerPed = PlayerPedId()
+        
+        if DoesEntityExist(playerPed) then
+            local coords = GetEntityCoords(playerPed)
+            local dist = #(coords - receptionCoords)
+
+            if dist < 10.0 then
+                sleep = 0
+                DrawMarker(1, receptionCoords.x, receptionCoords.y, receptionCoords.z - 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.2, 1.2, 0.5, 0, 100, 255, 150, false, true, 2, false, nil, nil, false)
+
+                if dist < 1.5 then
+                    local text = onDuty and 'Naciśnij ~INPUT_CONTEXT~ aby ~r~zakończyć~s~ służbę' or 'Naciśnij ~INPUT_CONTEXT~ aby ~b~rozpocząć~s~ służbę'
+                    ESX.ShowHelpNotification(text)
+
+                    if IsControlJustReleased(0, 38) then
+                        onDuty = not onDuty
+                        TriggerServerEvent('esx_sluzba:setDuty', onDuty)
+                        
+                        if onDuty then
+                            SetPoliceUniform()
+                            SpawnPoliceCar()
+                            RegisterPoliceRadialMenu()
+                        else
+                            RemovePoliceUniform()
+                            DeletePoliceCar()
+                        end
+                        Citizen.Wait(1000)
+                    end
+                end
+            end
+        end
+        Citizen.Wait(sleep)
+    end
+end)
+
+function SetPoliceUniform()
+    TriggerEvent('skinchanger:getSkin', function(skin)
+        if not skin then return end
+        local uniform = {}
+        if skin.sex == 0 then -- Facet
+            uniform = {
+                ['tshirt_1'] = 58, ['tshirt_2'] = 0,
+                ['torso_1'] = 55, ['torso_2'] = 0,
+                ['bproof_1'] = 27, ['bproof_2'] = 0, -- Żółta kamizelka odblaskowa
+                ['decals_1'] = 0, ['decals_2'] = 0,
+                ['arms'] = 41,
+                ['pants_1'] = 25, ['pants_2'] = 0,
+                ['shoes_1'] = 25, ['shoes_2'] = 0,
+                ['helmet_1'] = -1, ['helmet_2'] = 0,
+                ['chain_1'] = 0, ['chain_2'] = 0
+            }
+        else -- Kobieta
+            uniform = {
+                ['tshirt_1'] = 35, ['tshirt_2'] = 0,
+                ['torso_1'] = 48, ['torso_2'] = 0,
+                ['bproof_1'] = 18, ['bproof_2'] = 0,
+                ['decals_1'] = 0, ['decals_2'] = 0,
+                ['arms'] = 44,
+                ['pants_1'] = 34, ['pants_2'] = 0,
+                ['shoes_1'] = 27, ['shoes_2'] = 0,
+                ['helmet_1'] = -1, ['helmet_2'] = 0,
+                ['chain_1'] = 0, ['chain_2'] = 0
+            }
+        end
+        TriggerEvent('skinchanger:loadClothes', skin, uniform)
+    end)
+end
+
+function RemovePoliceUniform()
+    ESX.TriggerServerCallback('esx_skin:getPlayerSkin', function(skin)
+        if skin then
+            TriggerEvent('skinchanger:loadSkin', skin)
+        end
+    end)
+end
+
+function SpawnPoliceCar()
+    local model = 'police'
+    RequestModel(model)
+    while not HasModelLoaded(model) do
+        Citizen.Wait(10)
+    end
+
+    if DoesEntityExist(serviceVehicle) then
+        DeleteEntity(serviceVehicle)
+    end
+
+    local vehicle = CreateVehicle(GetHashKey(model), parkingCoords.x, parkingCoords.y, parkingCoords.z + 0.5, parkingHeading, true, false)
+    SetVehicleNumberPlateText(vehicle, 'LSPD ' .. math.random(100, 999))
+    SetVehicleDirtLevel(vehicle, 0.0)
+    SetVehicleEngineOn(vehicle, true, true, false)
+    SetEntityAsMissionEntity(vehicle, true, true)
+    
+    serviceVehicle = vehicle
+    ESX.ShowNotification('~b~Radiowóz~s~ został podstawiony na parking!')
+    SetModelAsNoLongerNeeded(model)
+end
+
+function DeletePoliceCar()
+    if DoesEntityExist(serviceVehicle) then
+        DeleteEntity(serviceVehicle)
+        serviceVehicle = nil
+    end
+end
+
+function RegisterPoliceRadialMenu()
+    if lib and lib.registerContext then
+        lib.registerContext({
+            id = 'police_duty_menu',
+            title = 'Panel Policyjny - LSPD',
+            options = {
+                {
+                    title = 'Pobierz wyposażenie',
+                    description = 'Pistolet, pałka, taser, kajdanki',
+                    icon = 'gun',
+                    onSelect = function()
+                        TriggerServerEvent('esx_sluzba:getEquipment')
+                    end
+                },
+                {
+                    title = 'Wyjedź radiowozem',
+                    description = 'Spawnuje radiowóz na parkingu',
+                    icon = 'car',
+                    onSelect = function()
+                        SpawnPoliceCar()
+                    end
+                },
+                {
+                    title = 'Załóż mundur i kamizelkę',
+                    description = 'Odświeża policyjny ubiór i kamizelkę',
+                    icon = 'vest',
+                    onSelect = function()
+                        SetPoliceUniform()
+                        ESX.ShowNotification('~b~Odświeżono ubiór i kamizelkę!~s~')
+                    end
+                },
+                {
+                    title = 'Zejdź ze służby',
+                    description = 'Oddaj sprzęt, broń i zdejmij mundur',
+                    icon = 'shield',
+                    onSelect = function()
+                        onDuty = false
+                        TriggerServerEvent('esx_sluzba:setDuty', false)
+                        RemovePoliceUniform()
+                        DeletePoliceCar()
+                    end
+                }
+            }
+        })
+    end
+end
+
+RegisterCommand('policja', function()
+    if onDuty then
+        if lib and lib.showContext then
+            lib.showContext('police_duty_menu')
+        else
+            ESX.ShowNotification('~r~Błąd:~s~ ox_lib nie jest załadowane!')
+        end
+    else
+        ESX.ShowNotification('~r~Nie jesteś na służbie!~s~ Użyj recepcji.')
+    end
+end, false)
+
+RegisterKeyMapping('policja', 'Otwórz panel policyjny LSPD', 'keyboard', 'F3')
