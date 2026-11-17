@@ -206,7 +206,36 @@ function RegisterPoliceRadialMenu()
                 onSelect = function()
                     selectedPoliceEquipment = 'Kajdanki'
                     SetCurrentPedWeapon(PlayerPedId(), GetHashKey('WEAPON_UNARMED'), true)
-                    ESX.ShowNotification('Wybrano: ~b~Kajdanki~s~. Podepnę ich użycie do akcji zakuwania w kolejnym kroku.')
+
+                    local closestPlayer = -1
+                    local closestDistance = 3.0
+                    local myCoords = GetEntityCoords(PlayerPedId())
+
+                    for _, playerId in ipairs(GetActivePlayers()) do
+                        if playerId ~= PlayerId() then
+                            local targetPed = GetPlayerPed(playerId)
+                            if DoesEntityExist(targetPed) then
+                                local distance = #(myCoords - GetEntityCoords(targetPed))
+                                if distance < closestDistance then
+                                    closestDistance = distance
+                                    closestPlayer = playerId
+                                end
+                            end
+                        end
+                    end
+
+                    if closestPlayer == -1 then
+                        ESX.ShowNotification('Wybrano: ~b~Kajdanki~s~. Brak osoby w zasięgu 3 metrów.')
+                        return
+                    end
+
+                    if GetResourceState('esx_policejob') ~= 'started' then
+                        ESX.ShowNotification('~r~System zakuwania esx_policejob nie jest uruchomiony.~s~')
+                        return
+                    end
+
+                    TriggerServerEvent('esx_policejob:handcuff', GetPlayerServerId(closestPlayer))
+                    ESX.ShowNotification('Używasz ~b~kajdanek~s~.')
                 end
             }
         }
