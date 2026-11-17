@@ -6,53 +6,7 @@ local HasAlreadyEnteredMarker, isDead, isHandcuffed, hasAlreadyJoined, playerInS
 local LastStation, LastPart, LastPartNum, LastEntity, CurrentAction, CurrentActionMsg
 dragStatus.isDragged, isInShopMenu = false, false
 
--- Reception duty interaction uses the resource's existing E keybind (xLib.addKeybind).
-CreateThread(function()
-	local reception = vector3(441.2, -981.9, 30.6)
-	local interactionDistance = 2.5
-	local markerDistance = 20.0
-	local wasNearReception = false
-
-	while true do
-		local sleep = 1000
-		local coords = GetEntityCoords(PlayerPedId())
-		local distance = #(coords - reception)
-
-		if distance < markerDistance then
-			sleep = 0
-			DrawMarker(2, reception.x, reception.y, reception.z + 0.15,
-				0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-				0.55, 0.55, 0.55, 40, 120, 220, 220,
-				false, true, 2, false, nil, nil, false)
-		end
-
-		if distance < interactionDistance then
-			if not wasNearReception then
-				print(('[POLICEJOB] Reception interaction active; distance=%.2f'):format(distance))
-				wasNearReception = true
-			end
-
-			local playerData = ESX and ESX.PlayerData
-			local job = playerData and playerData.job
-			local onDuty = LocalPlayer and LocalPlayer.state and LocalPlayer.state.policeDuty == true
-
-			CurrentAction = 'menu_duty'
-			CurrentActionMsg = (job and job.name == 'police' and onDuty)
-				and 'Naciśnij ~INPUT_CONTEXT~, aby zakończyć służbę'
-				or 'Naciśnij ~INPUT_CONTEXT~, aby rozpocząć służbę'
-			CurrentActionData = {}
-		elseif wasNearReception then
-			wasNearReception = false
-			if CurrentAction == 'menu_duty' then
-				CurrentAction = nil
-				CurrentActionMsg = nil
-				CurrentActionData = {}
-			end
-		end
-
-		Wait(sleep)
-	end
-end)
+-- Recepcję i przełączanie służby obsługuje wyłącznie zasób esx_sluzba.
 
 function OpenPoliceMenu(menuType, name, title, elements, submit, cancel, change, close)
 	return ESX.UI.Menu.Open(menuType, GetCurrentResourceName(), name, {
@@ -1447,15 +1401,6 @@ xLib.addKeybind({
 	defaultKey = "E",
 	onPressed = function()
 		if not CurrentAction then
-			return
-		end
-
-		if CurrentAction == 'menu_duty' then
-			print('[POLICEJOB] Reception E keybind pressed; sending toggleDuty')
-			TriggerServerEvent('esx_policejob:toggleDuty')
-			CurrentAction = nil
-			CurrentActionMsg = nil
-			CurrentActionData = {}
 			return
 		end
 
